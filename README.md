@@ -4,6 +4,8 @@
 
 run `npm install`
 
+rename .env.sample to .env
+
 update the .env file with your credentials
 
 run `node index.js`

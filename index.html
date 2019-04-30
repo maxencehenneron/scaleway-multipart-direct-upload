@@ -1,0 +1,60 @@
+<html>
+
+<head>
+  <title>Test page Scaleway upload</title>
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+</head>
+
+<body>
+  <input type="file" id="file" name="file">
+
+  <script>
+    const PART_SIZE = 5242880; // 5mb parts
+
+    // Uploads the selected file in chunks of 5mbs.
+    async function uploadFile(file) {
+      const fileName = file.name;
+
+      // We create the multipart upload
+      const uploadId = (await axios.get('/create_multipart_upload', { params: {fileName: fileName}})).data.upload_id;
+
+      let uploadedParts = []; // holds the partNumber and Etag for all the uploaded parts
+      let start = 0; // start of the current part in the byte array
+      let end = 0; // end of the current part in the byte array
+      let partNum = 1; // current part being uploaded
+
+      // uploading all the parts until we uploaded all the file
+      while (start < file.size) {
+        console.log(`uploading part ${partNum}`)
+
+        end = Math.min(start + PART_SIZE, file.size);
+        const filePart = file.slice(start, end);
+
+        // this is to prevent push a blob with 0Kb
+        if (filePart.size > 0) {
+          const url = (await axios.get('/part_upload_url', {params: {fileName: fileName, partNumber: partNum, uploadId: uploadId}})).data.url;
+          const res = await axios.put(url, filePart);
+          uploadedParts.push({"ETag": res.headers.etag, "PartNumber": partNum});
+        }
+
+        start = PART_SIZE * (partNum);
+        partNum += 1;
+      }
+
+      // All parts are uploaded, complete the upload
+      await axios.post('/complete_multipart_upload', {
+        uploadId: uploadId,
+        parts: uploadedParts,
+        fileName: fileName,
+      });
+    }
+
+    document.getElementById("file").onchange = function (event) {
+      uploadFile(event.target.files[0]).then(() => {
+        console.log("SUCCESS");
+      });
+    };
+  </script>
+</body>
+
+</html>
